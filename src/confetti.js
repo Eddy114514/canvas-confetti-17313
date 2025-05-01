@@ -244,6 +244,8 @@
       '#ffa62d',
       '#ff36ff'
     ],
+    frontColor: null,
+    backColor: null,
     // probably should be true, but back-compat
     disableForReducedMotion: false,
     scalar: 1
@@ -277,15 +279,11 @@
     return parseInt(str, 16);
   }
 
-  function colorsToRgb(colors) {
-    return colors.map(hexToRgb);
-  }
-
   function hexToRgb(str) {
     var val = String(str).replace(/[^0-9a-f]/gi, '');
 
     if (val.length < 6) {
-        val = val[0]+val[0]+val[1]+val[1]+val[2]+val[2];
+      val = val[0]+val[0]+val[1]+val[1]+val[2]+val[2];
     }
 
     return {
@@ -293,6 +291,17 @@
       g: toDecimal(val.substring(2,4)),
       b: toDecimal(val.substring(4,6))
     };
+  }
+
+  function colorsToRgb(colors) {
+    return colors.map(function(str) {
+      // If the color already starts with #, pass it directly
+      if (str.charAt(0) === '#') {
+        return hexToRgb(str.substring(1));
+      }
+      // Otherwise, treat it as a hex color without #
+      return hexToRgb(str);
+    });
   }
 
   function getOrigin(options) {
@@ -339,6 +348,11 @@
     var radAngle = opts.angle * (Math.PI / 180);
     var radSpread = opts.spread * (Math.PI / 180);
 
+    // Ensure color is properly formatted
+    var color = typeof opts.color === 'object' ? 
+      `rgba(${opts.color.r}, ${opts.color.g}, ${opts.color.b}, 1)` :
+      opts.color;
+
     return {
       x: opts.x,
       y: opts.y,
@@ -347,7 +361,7 @@
       velocity: (opts.startVelocity * 0.5) + (Math.random() * opts.startVelocity),
       angle2D: -radAngle + ((0.5 * radSpread) - (Math.random() * radSpread)),
       tiltAngle: (Math.random() * (0.75 - 0.25) + 0.25) * Math.PI,
-      color: opts.color,
+      color: color,
       shape: opts.shape,
       tick: 0,
       totalTicks: opts.ticks,
@@ -361,7 +375,9 @@
       gravity: opts.gravity * 3,
       ovalScalar: 0.6,
       scalar: opts.scalar,
-      flat: opts.flat
+      flat: opts.flat,
+      frontColor: opts.frontColor || color,
+      backColor: opts.backColor || color
     };
   }
 
@@ -396,7 +412,16 @@
     var x2 = fetti.wobbleX + (fetti.random * fetti.tiltCos);
     var y2 = fetti.wobbleY + (fetti.random * fetti.tiltSin);
 
-    context.fillStyle = 'rgba(' + fetti.color.r + ', ' + fetti.color.g + ', ' + fetti.color.b + ', ' + (1 - progress) + ')';
+    const isFront = Math.cos(fetti.tiltAngle) > 0;
+    var currentColor = isFront ? fetti.frontColor : fetti.backColor;
+    
+    // Ensure the color starts with # if it's a hex color
+    if (typeof currentColor === 'string' && currentColor.match(/^[0-9a-f]{6}$/i)) {
+      currentColor = '#' + currentColor;
+    }
+    
+    context.fillStyle = currentColor;
+    context.globalAlpha = 1 - progress;
 
     context.beginPath();
 
@@ -569,6 +594,8 @@
       var shapes = prop(options, 'shapes');
       var scalar = prop(options, 'scalar');
       var flat = !!prop(options, 'flat');
+      var frontColor = prop(options, 'frontColor');
+      var backColor = prop(options, 'backColor');
       var origin = getOrigin(options);
 
       var temp = particleCount;
@@ -592,7 +619,9 @@
             gravity: gravity,
             drift: drift,
             scalar: scalar,
-            flat: flat
+            flat: flat,
+            frontColor: frontColor,
+            backColor: backColor
           })
         );
       }
